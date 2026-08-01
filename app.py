@@ -1,18 +1,30 @@
 from pathlib import Path
 
-print("================================")
-print("       DokuSync v0.2")
-print("================================")
+APP_NAME = "AllOiz MediaSync"
+VERSION = "0.3"
 
-video_eingabe = input("Pfad zur Videodatei: ").strip()
-video = Path(video_eingabe)
+ERLAUBTE_FORMATE = {".mp4", ".mkv", ".webm", ".mov"}
 
-if video.is_file():
+print("=" * 40)
+print(f"       {APP_NAME} v{VERSION}")
+print("=" * 40)
+
+datei_eingabe = input("Pfad zur Mediendatei: ").strip()
+datei = Path(datei_eingabe)
+
+if not datei.is_file():
     print()
-    print("Video gefunden!")
-    print(f"Dateiname: {video.name}")
-    print(f"Ordner: {video.parent}")
-    print(f"Dateigröße: {video.stat().st_size} Bytes")
+    print("Fehler: Die Datei wurde nicht gefunden.")
+
+elif datei.suffix.lower() not in ERLAUBTE_FORMATE:
+    print()
+    print("Fehler: Dieses Dateiformat wird noch nicht unterstützt.")
+    print("Erlaubt sind: MP4, MKV, WEBM und MOV.")
+
 else:
     print()
-    print("Fehler: Die Videodatei wurde nicht gefunden.")
+    print("Datei gefunden!")
+    print(f"Dateiname: {datei.name}")
+    print(f"Format: {datei.suffix.lower()}")
+    print(f"Ordner: {datei.parent}")
+    print(f"Dateigröße: {datei.stat().st_size} Bytes")
