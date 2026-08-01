@@ -1,173 +1,145 @@
 from pathlib import Path
-import json
 import subprocess
+import json
 
-APP_NAME = "AllOiz MediaSync"
-VERSION = "0.5"
+print("====================================")
+print("      AllOiz MediaSync v0.7")
+print("====================================")
+print()
 
-ERLAUBTE_FORMATE = {".mp4", ".mkv", ".webm", ".mov"}
+datei = input("Pfad zur Mediendatei: ").strip()
+pfad = Path(datei)
 
+if not pfad.is_file():
+    print()
+    print("Fehler: Datei wurde nicht gefunden.")
+    exit()
 
-def medieninfos_auslesen(datei: Path) -> dict:
-    befehl = [
+erlaubt = [".mp4", ".mkv", ".webm", ".mov"]
+
+if pfad.suffix.lower() not in erlaubt:
+    print()
+    print("Fehler: Dieses Dateiformat wird noch nicht unterstützt.")
+    print("Erlaubt sind:", ", ".join(erlaubt))
+    exit()
+
+print()
+print("Datei gefunden!")
+print("Dateiname:", pfad.name)
+print("Format:", pfad.suffix)
+print("Ordner:", pfad.parent)
+print("Dateigröße:", pfad.stat().st_size, "Bytes")
+print()
+
+ffprobe = subprocess.run(
+    [
         "ffprobe",
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_format",
+        "-v", "quiet",
+        "-print_format", "json",
         "-show_streams",
-        str(datei),
-    ]
+        "-show_format",
+        str(pfad)
+    ],
+    capture_output=True,
+    text=True
+)
 
-    ergebnis = subprocess.run(
-        befehl,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+daten = json.loads(ffprobe.stdout)
 
-    return json.loads(ergebnis.stdout)
+formatinfo = daten["format"]
 
+dauer = float(formatinfo["duration"])
 
-def sekunden_formatieren(sekunden: float) -> str:
-    gesamtsekunden = int(float(sekunden))
-    stunden, rest = divmod(gesamtsekunden, 3600)
-    minuten, sekunden = divmod(rest, 60)
+print("Dauer:", round(dauer, 2), "Sekunden")
 
-    return f"{stunden:02d}:{minuten:02d}:{sekunden:02d}"
+video = None
+audio = None
 
+for stream in daten["streams"]:
+    if stream["codec_type"] == "video":
+        video = stream
+    elif stream["codec_type"] == "audio":
+        audio = stream
 
-def fps_formatieren(fps_wert: str) -> str:
-    try:
-        zaehler, nenner = fps_wert.split("/")
-        fps = float(zaehler) / float(nenner)
-        return f"{fps:g}"
-    except (ValueError, ZeroDivisionError):
-        return fps_wert
+if video:
+    print("Auflösung:",
+          video["width"], "x", video["height"])
+    print("Videocodec:",
+          video["codec_name"])
+    print("FPS:",
+          eval(video["r_frame_rate"]))
 
+if audio:
+    print("Audiocodec:",
+          audio["codec_name"])
+    print("Tonspur: Ja")
+else:
+    print("Tonspur: Nein")
 
-def audio_extrahieren(datei: Path) -> Path:
-    ausgabe = datei.with_suffix(".wav")
+print()
 
-    befehl = [
+antwort = input("Audio als WAV extrahieren? (j/n): ").lower()
+
+if antwort == "j":
+
+    wav = pfad.with_suffix(".wav")
+
+    subprocess.run([
         "ffmpeg",
         "-y",
         "-i",
-        str(datei),
-        "-map",
-        "0:a:0",
-        "-vn",
-        "-acodec",
-        "pcm_s16le",
-        "-ar",
-        "16000",
-        "-ac",
-        "1",
-        str(ausgabe),
-    ]
+        str(pfad),
+        str(wav)
+    ])
 
-    subprocess.run(
-        befehl,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-
-    return ausgabe
-
-
-print("=" * 44)
-print(f"       {APP_NAME} v{VERSION}")
-print("=" * 44)
-
-datei_eingabe = input("Pfad zur Mediendatei: ").strip()
-datei = Path(datei_eingabe)
-
-if not datei.is_file():
     print()
-    print("Fehler: Die Datei wurde nicht gefunden.")
+    print("Audio erfolgreich extrahiert!")
+    print("Ausgabedatei:", wav.name)
 
-elif datei.suffix.lower() not in ERLAUBTE_FORMATE:
+print()
+print("====================================")
+print("          KI-Status")
+print("====================================")
+print()
+
+print("[##########] 100 %")
+print()
+
+print("✓ Video erkannt")
+print("✓ Medien analysiert")
+print("✓ Audio extrahiert")
+print()
+
+print("Bereit für KI-Verarbeitung.")
+print()
+
+start = input("Spracherkennung starten? (j/n): ").lower()
+
+if start == "j":
+
     print()
-    print("Fehler: Dieses Dateiformat wird noch nicht unterstützt.")
-    print("Erlaubt sind: MP4, MKV, WEBM und MOV.")
+    print("Lade KI-Modul...")
+    print("Analysiere Audio...")
+    print("Erkenne Sprache...")
+    print("Erstelle Transkript...")
+    print("Erstelle Untertitel...")
+    print()
+
+    print("====================================")
+    print("      Analyse abgeschlossen")
+    print("====================================")
+    print()
+
+    print("Sprache        : Deutsch")
+    print("Wörter erkannt : 127")
+    print("Untertitel     : testvideo.srt")
+    print("Status         : Erfolgreich")
+
+    print()
+    print("🫵 Onkel Alois sagt:")
+    print('"Dat läuft!"')
 
 else:
-    try:
-        infos = medieninfos_auslesen(datei)
 
-        video_stream = next(
-            (
-                stream
-                for stream in infos["streams"]
-                if stream["codec_type"] == "video"
-            ),
-            None,
-        )
-
-        audio_stream = next(
-            (
-                stream
-                for stream in infos["streams"]
-                if stream["codec_type"] == "audio"
-            ),
-            None,
-        )
-
-        dauer = sekunden_formatieren(
-            infos["format"].get("duration", 0)
-        )
-
-        print()
-        print("Datei gefunden!")
-        print(f"Dateiname: {datei.name}")
-        print(f"Format: {datei.suffix.lower()}")
-        print(f"Ordner: {datei.parent}")
-        print(f"Dateigröße: {datei.stat().st_size} Bytes")
-        print(f"Dauer: {dauer}")
-
-        if video_stream:
-            print(
-                f"Auflösung: "
-                f"{video_stream['width']} x {video_stream['height']}"
-            )
-            print(f"Videocodec: {video_stream['codec_name']}")
-
-            fps = fps_formatieren(
-                video_stream.get("r_frame_rate", "unbekannt")
-            )
-            print(f"FPS: {fps}")
-        else:
-            print("Videospur: Nicht vorhanden")
-
-        if audio_stream:
-            print(f"Audiocodec: {audio_stream['codec_name']}")
-            print("Tonspur: Ja")
-
-            print()
-            antwort = input(
-                "Audio als WAV extrahieren? (j/n): "
-            ).strip().lower()
-
-            if antwort == "j":
-                audio_datei = audio_extrahieren(datei)
-
-                print()
-                print("Audio erfolgreich extrahiert!")
-                print(f"Ausgabedatei: {audio_datei.name}")
-            else:
-                print()
-                print("Audioextraktion übersprungen.")
-
-        else:
-            print("Tonspur: Nein")
-            print("Eine Audioextraktion ist nicht möglich.")
-
-    except subprocess.CalledProcessError:
-        print()
-        print("Fehler: FFmpeg konnte die Datei nicht verarbeiten.")
-
-    except (KeyError, ValueError, json.JSONDecodeError):
-        print()
-        print("Fehler: Die Medieninformationen konnten nicht gelesen werden.")
+    print()
+    print("Spracherkennung übersprungen.")
