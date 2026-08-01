@@ -1,12 +1,13 @@
 from pathlib import Path
 import json
 import os
+import shutil
 import subprocess
 import sys
 
 
 APP_NAME = "AllOiz MediaSync"
-VERSION = "0.9"
+VERSION = "1.0"
 
 ERLAUBTE_FORMATE = {
     ".mp4",
@@ -28,7 +29,9 @@ def fps_formatieren(fps_wert: str) -> str:
     try:
         zaehler, nenner = fps_wert.split("/")
         fps = float(zaehler) / float(nenner)
+
         return f"{fps:g}"
+
     except (ValueError, ZeroDivisionError):
         return fps_wert
 
@@ -210,9 +213,84 @@ def projektdatei_speichern(
     return projektdatei
 
 
-print("=" * 50)
-print(f"          {APP_NAME} v{VERSION}")
-print("=" * 50)
+def readme_erstellen(
+    projektordner: Path,
+    datei: Path,
+    audio_datei: Path,
+    ki_verfuegbar: bool,
+) -> Path:
+    readme = projektordner / "README.txt"
+
+    if ki_verfuegbar:
+        naechster_schritt = (
+            "Dieses Gerät unterstützt die KI-Verarbeitung.\n"
+            "Das Projekt kann hier transkribiert werden."
+        )
+    else:
+        naechster_schritt = (
+            "Dieses ZIP-Paket auf den Haupt-PC kopieren.\n"
+            "Dort kann die WAV-Datei mit Faster-Whisper\n"
+            "transkribiert und in Untertitel umgewandelt werden."
+        )
+
+    inhalt = f"""
+==================================================
+              AllOiz MediaSync v{VERSION}
+==================================================
+
+Projektname:
+{datei.stem}
+
+Originaldatei:
+{datei.name}
+
+Vorbereitete Audiodatei:
+{audio_datei.name}
+
+Enthaltene Dateien:
+- {audio_datei.name}
+- projekt.json
+- README.txt
+
+Nächster Schritt:
+{naechster_schritt}
+
+==================================================
+
+Onkel Alois sagt:
+"Alles drin. Jetzt kann dat weitergehen!"
+
+==================================================
+""".strip()
+
+    readme.write_text(
+        inhalt,
+        encoding="utf-8",
+    )
+
+    return readme
+
+
+def projekt_als_zip_verpacken(
+    projektordner: Path,
+) -> Path:
+    zip_datei = projektordner.with_suffix(".zip")
+
+    if zip_datei.exists():
+        zip_datei.unlink()
+
+    erzeugter_pfad = shutil.make_archive(
+        base_name=str(projektordner),
+        format="zip",
+        root_dir=str(projektordner),
+    )
+
+    return Path(erzeugter_pfad)
+
+
+print("=" * 52)
+print(f"           {APP_NAME} v{VERSION}")
+print("=" * 52)
 print()
 
 datei_eingabe = input(
@@ -234,7 +312,6 @@ if datei.suffix.lower() not in ERLAUBTE_FORMATE:
 
 try:
     infos = medieninfos_auslesen(datei)
-
     streams = infos.get("streams", [])
 
     video_stream = next(
@@ -301,7 +378,7 @@ try:
 
     print()
     antwort = input(
-        "AllOiz-Projekt erstellen? (j/n): "
+        "AllOiz-Projektpaket erstellen? (j/n): "
     ).strip().lower()
 
     if antwort != "j":
@@ -327,9 +404,9 @@ try:
     print(f"WAV-Datei: {audio_datei.name}")
 
     print()
-    print("=" * 50)
-    print("                 KI-Prüfung")
-    print("=" * 50)
+    print("=" * 52)
+    print("                  KI-Prüfung")
+    print("=" * 52)
 
     ki_ok, ki_meldung = ki_modul_pruefen()
 
@@ -346,26 +423,43 @@ try:
         ki_verfuegbar=ki_ok,
     )
 
+    readme = readme_erstellen(
+        projektordner=projektordner,
+        datei=datei,
+        audio_datei=audio_datei,
+        ki_verfuegbar=ki_ok,
+    )
+
     print()
-    print("=" * 50)
-    print("              Projekt abgeschlossen")
-    print("=" * 50)
+    print("Projektdatei wurde erstellt.")
+    print("README wurde erstellt.")
+    print("Projekt wird als ZIP verpackt...")
+
+    zip_datei = projekt_als_zip_verpacken(
+        projektordner
+    )
+
+    print()
+    print("=" * 52)
+    print("             Projektpaket abgeschlossen")
+    print("=" * 52)
     print()
     print(f"Projektordner: {projektordner}")
     print(f"WAV-Datei: {audio_datei.name}")
     print(f"Projektdatei: {projektdatei.name}")
+    print(f"Anleitung: {readme.name}")
+    print(f"ZIP-Paket: {zip_datei}")
+    print()
 
     if ki_ok:
-        print()
         print("Dieses Gerät kann die Transkription übernehmen.")
     else:
-        print()
-        print("Der Projektordner kann jetzt auf den")
-        print("Haupt-PC kopiert und dort transkribiert werden.")
+        print("Das ZIP-Paket kann jetzt auf den Haupt-PC")
+        print("kopiert und dort transkribiert werden.")
 
     print()
     print("Onkel Alois sagt:")
-    print('"Alles eingepackt. Ab zum großen Rechner!"')
+    print('"Alles gezippt. Abfahrt!"')
 
 except subprocess.CalledProcessError as fehler:
     print()
@@ -381,7 +475,7 @@ except json.JSONDecodeError:
 
 except OSError as fehler:
     print()
-    print("Fehler beim Erstellen oder Speichern des Projekts:")
+    print("Fehler beim Erstellen oder Speichern:")
     print(fehler)
 
 except Exception as fehler:
