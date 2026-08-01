@@ -6,7 +6,7 @@ import sys
 
 
 APP_NAME = "AllOiz MediaSync"
-VERSION = "0.8"
+VERSION = "0.9"
 
 ERLAUBTE_FORMATE = {
     ".mp4",
@@ -55,8 +55,21 @@ def medieninfos_auslesen(datei: Path) -> dict:
     return json.loads(ergebnis.stdout)
 
 
-def audio_extrahieren(datei: Path) -> Path:
-    ausgabe = datei.with_suffix(".wav")
+def projektordner_erstellen(datei: Path) -> Path:
+    hauptordner = Path("AllOiz_Projekte")
+    hauptordner.mkdir(exist_ok=True)
+
+    projektordner = hauptordner / datei.stem
+    projektordner.mkdir(exist_ok=True)
+
+    return projektordner
+
+
+def audio_extrahieren(
+    datei: Path,
+    projektordner: Path,
+) -> Path:
+    ausgabe = projektordner / f"{datei.stem}.wav"
 
     befehl = [
         "ffmpeg",
@@ -113,80 +126,93 @@ def ki_modul_pruefen() -> tuple[bool, str]:
     fehlermeldung = ergebnis.stderr.strip()
 
     if not fehlermeldung:
-        fehlermeldung = "Unbekannter Fehler beim Laden des KI-Moduls."
+        fehlermeldung = "Das KI-Modul konnte nicht geladen werden."
 
     return False, fehlermeldung
 
 
-def srt_zeit(sekunden: float) -> str:
-    millisekunden = int((sekunden % 1) * 1000)
-    gesamt = int(sekunden)
+def projektdatei_speichern(
+    projektordner: Path,
+    datei: Path,
+    audio_datei: Path,
+    dauer: str,
+    video_stream: dict | None,
+    audio_stream: dict | None,
+    ki_verfuegbar: bool,
+) -> Path:
+    projekt_daten = {
+        "programm": APP_NAME,
+        "version": VERSION,
+        "projektname": datei.stem,
+        "originaldatei": str(datei.resolve()),
+        "dateiname": datei.name,
+        "format": datei.suffix.lower(),
+        "dateigroesse_bytes": datei.stat().st_size,
+        "dauer": dauer,
+        "wav_datei": audio_datei.name,
+        "ki_lokal_verfuegbar": ki_verfuegbar,
+        "status": (
+            "Bereit für lokale Transkription"
+            if ki_verfuegbar
+            else "Bereit für Transkription auf dem Haupt-PC"
+        ),
+    }
 
-    stunden, rest = divmod(gesamt, 3600)
-    minuten, sekunden = divmod(rest, 60)
+    if video_stream:
+        projekt_daten["video"] = {
+            "codec": video_stream.get(
+                "codec_name",
+                "unbekannt",
+            ),
+            "breite": video_stream.get(
+                "width",
+                "unbekannt",
+            ),
+            "hoehe": video_stream.get(
+                "height",
+                "unbekannt",
+            ),
+            "fps": fps_formatieren(
+                video_stream.get(
+                    "r_frame_rate",
+                    "unbekannt",
+                )
+            ),
+        }
 
-    return (
-        f"{stunden:02d}:{minuten:02d}:{sekunden:02d},"
-        f"{millisekunden:03d}"
-    )
+    if audio_stream:
+        projekt_daten["audio"] = {
+            "codec": audio_stream.get(
+                "codec_name",
+                "unbekannt",
+            ),
+            "kanaele": audio_stream.get(
+                "channels",
+                "unbekannt",
+            ),
+            "abtastrate": audio_stream.get(
+                "sample_rate",
+                "unbekannt",
+            ),
+        }
 
+    projektdatei = projektordner / "projekt.json"
 
-def transkribieren(audio_datei: Path) -> tuple[Path, str]:
-    from faster_whisper import WhisperModel
-
-    print()
-    print("Lade Whisper-Modell...")
-    print("Beim ersten Start wird das Modell heruntergeladen.")
-
-    modell = WhisperModel(
-        "tiny",
-        device="cpu",
-        compute_type="int8",
-    )
-
-    print("Transkription läuft...")
-
-    segmente, info = modell.transcribe(
-        str(audio_datei),
-        beam_size=5,
-        vad_filter=True,
-    )
-
-    srt_datei = audio_datei.with_suffix(".srt")
-    text_datei = audio_datei.with_suffix(".txt")
-
-    alle_texte = []
-
-    with srt_datei.open(
-        "w",
+    projektdatei.write_text(
+        json.dumps(
+            projekt_daten,
+            indent=4,
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
-    ) as srt:
-        for nummer, segment in enumerate(segmente, start=1):
-            text = segment.text.strip()
-
-            if not text:
-                continue
-
-            alle_texte.append(text)
-
-            srt.write(f"{nummer}\n")
-            srt.write(
-                f"{srt_zeit(segment.start)} --> "
-                f"{srt_zeit(segment.end)}\n"
-            )
-            srt.write(f"{text}\n\n")
-
-    text_datei.write_text(
-        "\n".join(alle_texte),
-        encoding="utf-8",
     )
 
-    return srt_datei, info.language
+    return projektdatei
 
 
-print("=" * 46)
-print(f"       {APP_NAME} v{VERSION}")
-print("=" * 46)
+print("=" * 50)
+print(f"          {APP_NAME} v{VERSION}")
+print("=" * 50)
 print()
 
 datei_eingabe = input(
@@ -209,10 +235,12 @@ if datei.suffix.lower() not in ERLAUBTE_FORMATE:
 try:
     infos = medieninfos_auslesen(datei)
 
+    streams = infos.get("streams", [])
+
     video_stream = next(
         (
             stream
-            for stream in infos.get("streams", [])
+            for stream in streams
             if stream.get("codec_type") == "video"
         ),
         None,
@@ -221,7 +249,7 @@ try:
     audio_stream = next(
         (
             stream
-            for stream in infos.get("streams", [])
+            for stream in streams
             if stream.get("codec_type") == "audio"
         ),
         None,
@@ -245,7 +273,7 @@ try:
 
         print(f"Auflösung: {breite} x {hoehe}")
         print(
-            f"Videocodec: "
+            "Videocodec: "
             f"{video_stream.get('codec_name', 'unbekannt')}"
         )
 
@@ -262,77 +290,82 @@ try:
 
     if not audio_stream:
         print("Tonspur: Nein")
-        print("Ohne Tonspur ist keine Transkription möglich.")
+        print("Ohne Tonspur kann kein Projekt erstellt werden.")
         raise SystemExit(0)
 
     print(
-        f"Audiocodec: "
+        "Audiocodec: "
         f"{audio_stream.get('codec_name', 'unbekannt')}"
     )
     print("Tonspur: Ja")
 
     print()
     antwort = input(
-        "Audio als WAV extrahieren? (j/n): "
+        "AllOiz-Projekt erstellen? (j/n): "
     ).strip().lower()
 
     if antwort != "j":
         print()
-        print("Audioextraktion übersprungen.")
+        print("Projekterstellung abgebrochen.")
         raise SystemExit(0)
 
-    audio_datei = audio_extrahieren(datei)
+    projektordner = projektordner_erstellen(datei)
 
     print()
+    print("Projektordner wurde erstellt:")
+    print(projektordner)
+
+    print()
+    print("Audio wird vorbereitet...")
+
+    audio_datei = audio_extrahieren(
+        datei,
+        projektordner,
+    )
+
     print("Audio erfolgreich extrahiert!")
-    print(f"Ausgabedatei: {audio_datei.name}")
+    print(f"WAV-Datei: {audio_datei.name}")
 
     print()
-    print("=" * 46)
-    print("              KI-Prüfung")
-    print("=" * 46)
+    print("=" * 50)
+    print("                 KI-Prüfung")
+    print("=" * 50)
 
-    ki_ok, meldung = ki_modul_pruefen()
+    ki_ok, ki_meldung = ki_modul_pruefen()
 
-    if not ki_ok:
+    print()
+    print(ki_meldung)
+
+    projektdatei = projektdatei_speichern(
+        projektordner=projektordner,
+        datei=datei,
+        audio_datei=audio_datei,
+        dauer=dauer,
+        video_stream=video_stream,
+        audio_stream=audio_stream,
+        ki_verfuegbar=ki_ok,
+    )
+
+    print()
+    print("=" * 50)
+    print("              Projekt abgeschlossen")
+    print("=" * 50)
+    print()
+    print(f"Projektordner: {projektordner}")
+    print(f"WAV-Datei: {audio_datei.name}")
+    print(f"Projektdatei: {projektdatei.name}")
+
+    if ki_ok:
         print()
-        print("KI-Modul nicht verfügbar.")
-        print(meldung)
+        print("Dieses Gerät kann die Transkription übernehmen.")
+    else:
         print()
-        print("Die WAV-Datei wurde trotzdem vorbereitet.")
-        print("Sie kann auf dem Haupt-PC transkribiert werden.")
-        print()
-        print("Onkel Alois sagt:")
-        print('"Dann macht dat eben der große Rechner!"')
-        raise SystemExit(0)
+        print("Der Projektordner kann jetzt auf den")
+        print("Haupt-PC kopiert und dort transkribiert werden.")
 
-    print()
-    print("KI-Modul verfügbar.")
-    print("Faster-Whisper kann gestartet werden.")
-
-    print()
-    start = input(
-        "Echte Spracherkennung starten? (j/n): "
-    ).strip().lower()
-
-    if start != "j":
-        print()
-        print("Spracherkennung übersprungen.")
-        raise SystemExit(0)
-
-    srt_datei, sprache = transkribieren(audio_datei)
-
-    print()
-    print("=" * 46)
-    print("         Transkription abgeschlossen")
-    print("=" * 46)
-    print()
-    print(f"Erkannte Sprache: {sprache}")
-    print(f"Untertiteldatei: {srt_datei.name}")
-    print(f"Textdatei: {audio_datei.with_suffix('.txt').name}")
     print()
     print("Onkel Alois sagt:")
-    print('"Dat wurde wirklich verstanden!"')
+    print('"Alles eingepackt. Ab zum großen Rechner!"')
 
 except subprocess.CalledProcessError as fehler:
     print()
@@ -345,6 +378,11 @@ except subprocess.CalledProcessError as fehler:
 except json.JSONDecodeError:
     print()
     print("Fehler: Die Medieninformationen waren ungültig.")
+
+except OSError as fehler:
+    print()
+    print("Fehler beim Erstellen oder Speichern des Projekts:")
+    print(fehler)
 
 except Exception as fehler:
     print()
