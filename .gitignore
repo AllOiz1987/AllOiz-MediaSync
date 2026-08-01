@@ -1,3 +1,5 @@
 .venv/
 *.wav
 *.srt
+AllOiz_Projekte/
+*.mp4
