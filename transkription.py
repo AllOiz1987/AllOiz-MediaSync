@@ -5,19 +5,27 @@ from pathlib import Path
 from faster_whisper import WhisperModel
 
 
-MODELL_NAME = "small"
+STANDARD_MODELL = "small"
 
 
 def srt_zeit(sekunden: float) -> str:
     """Wandelt Sekunden in das SRT-Zeitformat um."""
-    millisekunden_gesamt = max(0, int(round(sekunden * 1000)))
+    millisekunden_gesamt = max(
+        0,
+        int(round(sekunden * 1000)),
+    )
 
-    stunden, rest = divmod(millisekunden_gesamt, 3_600_000)
+    stunden, rest = divmod(
+        millisekunden_gesamt,
+        3_600_000,
+    )
     minuten, rest = divmod(rest, 60_000)
     sekunden, millisekunden = divmod(rest, 1000)
 
     return (
-        f"{stunden:02d}:{minuten:02d}:{sekunden:02d},"
+        f"{stunden:02d}:"
+        f"{minuten:02d}:"
+        f"{sekunden:02d},"
         f"{millisekunden:03d}"
     )
 
@@ -26,39 +34,57 @@ def transkribieren(
     audio_datei: Path,
     ki_ordner: Path,
     untertitel_ordner: Path,
+    modell_name: str = STANDARD_MODELL,
+    sprache: str | None = None,
 ) -> dict[str, object]:
     """
-    Transkribiert eine Audiodatei und erzeugt TXT- und SRT-Dateien.
+    Transkribiert eine Audiodatei und erzeugt
+    TXT- und SRT-Dateien.
     """
 
     if not audio_datei.exists():
         raise FileNotFoundError(
-            f"Audiodatei wurde nicht gefunden: {audio_datei}"
+            f"Audiodatei wurde nicht gefunden: "
+            f"{audio_datei}"
         )
 
-    ki_ordner.mkdir(parents=True, exist_ok=True)
-    untertitel_ordner.mkdir(parents=True, exist_ok=True)
+    ki_ordner.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    untertitel_ordner.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     modell = WhisperModel(
-        MODELL_NAME,
+        modell_name,
         device="cpu",
         compute_type="int8",
     )
 
+    optionen: dict[str, object] = {
+        "beam_size": 5,
+        "vad_filter": True,
+    }
+
+    if sprache:
+        optionen["language"] = sprache
+
     segmente, info = modell.transcribe(
         str(audio_datei),
-        beam_size=5,
-        vad_filter=True,
+        **optionen,
     )
 
-    # Faster-Whisper liefert einen Generator.
-    # Deshalb speichern wir alle Segmente in einer Liste.
     segment_liste = list(segmente)
 
     text_zeilen: list[str] = []
     srt_bloecke: list[str] = []
 
-    for nummer, segment in enumerate(segment_liste, start=1):
+    for nummer, segment in enumerate(
+        segment_liste,
+        start=1,
+    ):
         text = segment.text.strip()
 
         if not text:
@@ -79,7 +105,10 @@ def transkribieren(
             )
         )
 
-    txt_datei = ki_ordner / f"{audio_datei.stem}_transkript.txt"
+    txt_datei = (
+        ki_ordner
+        / f"{audio_datei.stem}_transkript.txt"
+    )
     srt_datei = (
         untertitel_ordner
         / f"{audio_datei.stem}_untertitel.srt"
@@ -97,7 +126,10 @@ def transkribieren(
 
     return {
         "sprache": info.language,
-        "sprachwahrscheinlichkeit": info.language_probability,
+        "sprachwahrscheinlichkeit": (
+            info.language_probability
+        ),
+        "modell": modell_name,
         "segmente": len(segment_liste),
         "txt_datei": txt_datei,
         "srt_datei": srt_datei,

@@ -551,6 +551,14 @@ class AllOizApp:
         self.ki_status = StringVar(
             value="KI-Modul noch nicht geprüft."
         )
+        self.modell_auswahl = StringVar(
+            value="Ausgewogen – small"
+        )
+        self.sprache_auswahl = StringVar(
+            value="Automatisch erkennen"
+        )
+        self.aktives_modell = "small"
+        self.aktive_sprache: str | None = None
 
         self.fenster.title(
             f"{APP_NAME} v{VERSION}"
@@ -688,6 +696,42 @@ class AllOizApp:
             lightcolor=TUERKIS,
             darkcolor=TUERKIS,
         )
+        stil.configure(
+            "TCombobox",
+            background=PANEL_HELL,
+            fieldbackground=PANEL_HELL,
+            foreground=TEXT,
+            arrowcolor=TUERKIS,
+            bordercolor=PANEL_HELL,
+            padding=6,
+        )
+        stil.map(
+            "TCombobox",
+            fieldbackground=[
+                ("readonly", PANEL_HELL),
+                ("disabled", PANEL),
+            ],
+            foreground=[
+                ("readonly", TEXT),
+                ("disabled", "#707680"),
+            ],
+        )
+        self.fenster.option_add(
+            "*TCombobox*Listbox.background",
+            PANEL_HELL,
+        )
+        self.fenster.option_add(
+            "*TCombobox*Listbox.foreground",
+            TEXT,
+        )
+        self.fenster.option_add(
+            "*TCombobox*Listbox.selectBackground",
+            TUERKIS,
+        )
+        self.fenster.option_add(
+            "*TCombobox*Listbox.selectForeground",
+            DUNKEL,
+        )
 
     def oberflaeche_erstellen(self) -> None:
         hauptbereich = ttk.Frame(
@@ -760,6 +804,77 @@ class AllOizApp:
             justify=LEFT,
         )
         self.info_text.pack(anchor="w")
+
+        ki_einstellungen = ttk.LabelFrame(
+            hauptbereich,
+            text="KI-Einstellungen",
+            padding=12,
+        )
+        ki_einstellungen.pack(
+            fill="x",
+            pady=(0, 12),
+        )
+
+        modell_label = ttk.Label(
+            ki_einstellungen,
+            text="Whisper-Modell:",
+        )
+        modell_label.grid(
+            row=0,
+            column=0,
+            sticky="w",
+            padx=(0, 8),
+        )
+
+        self.modell_box = ttk.Combobox(
+            ki_einstellungen,
+            textvariable=self.modell_auswahl,
+            values=(
+                "Schnell – tiny",
+                "Ausgewogen – small",
+                "Genauer – medium",
+            ),
+            state="readonly",
+            width=24,
+        )
+        self.modell_box.grid(
+            row=0,
+            column=1,
+            sticky="ew",
+            padx=(0, 24),
+        )
+
+        sprache_label = ttk.Label(
+            ki_einstellungen,
+            text="Sprache:",
+        )
+        sprache_label.grid(
+            row=0,
+            column=2,
+            sticky="w",
+            padx=(0, 8),
+        )
+
+        self.sprache_box = ttk.Combobox(
+            ki_einstellungen,
+            textvariable=self.sprache_auswahl,
+            values=(
+                "Automatisch erkennen",
+                "Deutsch",
+                "Englisch",
+                "Polnisch",
+            ),
+            state="readonly",
+            width=22,
+        )
+        self.sprache_box.grid(
+            row=0,
+            column=3,
+            sticky="ew",
+        )
+
+        ki_einstellungen.columnconfigure(1, weight=1)
+        ki_einstellungen.columnconfigure(3, weight=1)
 
         aktionen = ttk.Frame(hauptbereich)
         aktionen.pack(
@@ -926,10 +1041,14 @@ class AllOizApp:
         self.analyse_button.config(state=DISABLED)
         self.start_button.config(state=DISABLED)
         self.ki_button.config(state=DISABLED)
+        self.modell_box.config(state=DISABLED)
+        self.sprache_box.config(state=DISABLED)
         self.fortschritt.start(12)
 
     def bedienung_freigeben(self) -> None:
         self.auswahl_button.config(state=NORMAL)
+        self.modell_box.config(state="readonly")
+        self.sprache_box.config(state="readonly")
 
         if self.datei:
             self.analyse_button.config(state=NORMAL)
@@ -1349,10 +1468,32 @@ class AllOizApp:
             )
             return
 
+        modell_map = {
+            "Schnell – tiny": "tiny",
+            "Ausgewogen – small": "small",
+            "Genauer – medium": "medium",
+        }
+        sprache_map = {
+            "Automatisch erkennen": None,
+            "Deutsch": "de",
+            "Englisch": "en",
+            "Polnisch": "pl",
+        }
+
+        self.aktives_modell = modell_map.get(
+            self.modell_auswahl.get(),
+            "small",
+        )
+        self.aktive_sprache = sprache_map.get(
+            self.sprache_auswahl.get()
+        )
+
         self.bedienung_sperren()
         self.status.set("KI-Transkription läuft …")
         self.log_schreiben(
-            "Lokale KI-Transkription wird gestartet."
+            "Lokale KI-Transkription wird gestartet. "
+            f"Modell: {self.aktives_modell}, "
+            f"Sprache: {self.aktive_sprache or 'automatisch'}."
         )
 
         threading.Thread(
@@ -1378,6 +1519,8 @@ class AllOizApp:
                 untertitel_ordner=self.letztes_projekt[
                     "untertitel_ordner"
                 ],
+                modell_name=self.aktives_modell,
+                sprache=self.aktive_sprache,
             )
 
             fortschritt(
@@ -1398,6 +1541,7 @@ class AllOizApp:
 
     def transkription_fertig(self, ergebnis: dict) -> None:
         sprache = ergebnis.get("sprache", "unbekannt")
+        modell = ergebnis.get("modell", "unbekannt")
         txt_datei = ergebnis["txt_datei"]
         srt_datei = ergebnis["srt_datei"]
 
@@ -1405,7 +1549,7 @@ class AllOizApp:
             "KI-Transkription erfolgreich abgeschlossen."
         )
         self.ki_status.set(
-            f"Erkannte Sprache: {sprache}"
+            f"Erkannte Sprache: {sprache} | Modell: {modell}"
         )
         self.log_schreiben(f"Transkript: {txt_datei}")
         self.log_schreiben(f"Untertitel: {srt_datei}")
@@ -1418,6 +1562,7 @@ class AllOizApp:
             (
                 "Die lokale KI-Transkription ist fertig."
                 f"\n\nErkannte Sprache: {sprache}"
+                f"\nVerwendetes Modell: {modell}"
                 f"\n\nTranskript:\n{txt_datei}"
                 f"\n\nUntertitel:\n{srt_datei}"
             ),
