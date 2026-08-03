@@ -16,3 +16,5 @@ AllOiz_Projekte/
 build/
 dist/
 *.spec
+
+vendor/
