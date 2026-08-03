@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from queue import Empty, Queue
@@ -32,7 +33,7 @@ from transkription import transkribieren
 
 
 APP_NAME = "AllOiz MediaSync"
-VERSION = "1.4"
+VERSION = "1.6"
 
 ERLAUBTE_FORMATE = {
     ".mp4",
@@ -114,8 +115,47 @@ def dateigroesse_formatieren(bytes_anzahl: int) -> str:
     return f"{bytes_anzahl} Bytes"
 
 
+def anwendungsordner() -> Path:
+    """Liefert den Ordner der EXE oder des Python-Quellcodes."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+
+    return Path(__file__).resolve().parent
+
+
+def programm_pfad(name: str) -> str | None:
+    """Findet ein mitgeliefertes Programm oder die PATH-Version."""
+    dateiname = f"{name}.exe" if os.name == "nt" else name
+
+    kandidaten: list[Path] = []
+
+    if getattr(sys, "frozen", False):
+        bundle_ordner = Path(
+            getattr(sys, "_MEIPASS", anwendungsordner())
+        )
+        kandidaten.extend(
+            [
+                bundle_ordner / "ffmpeg" / dateiname,
+                anwendungsordner() / "ffmpeg" / dateiname,
+            ]
+        )
+    else:
+        kandidaten.append(
+            anwendungsordner()
+            / "vendor"
+            / "ffmpeg"
+            / dateiname
+        )
+
+    for kandidat in kandidaten:
+        if kandidat.is_file():
+            return str(kandidat)
+
+    return shutil.which(name)
+
+
 def programm_verfuegbar(name: str) -> bool:
-    return shutil.which(name) is not None
+    return programm_pfad(name) is not None
 
 
 def voraussetzungen_pruefen() -> None:
@@ -138,7 +178,7 @@ def voraussetzungen_pruefen() -> None:
 
 def medieninfos_auslesen(datei: Path) -> dict:
     befehl = [
-        "ffprobe",
+        programm_pfad("ffprobe") or "ffprobe",
         "-v",
         "quiet",
         "-print_format",
@@ -190,7 +230,7 @@ def projektstruktur_erstellen(
     datei: Path,
 ) -> dict[str, Path]:
     hauptordner = (
-        Path(__file__).resolve().parent
+        anwendungsordner()
         / "AllOiz_Projekte"
     )
     hauptordner.mkdir(exist_ok=True)
@@ -239,7 +279,7 @@ def audio_extrahieren(
     ausgabe = audio_ordner / f"{projektname}.wav"
 
     befehl = [
-        "ffmpeg",
+        programm_pfad("ffmpeg") or "ffmpeg",
         "-y",
         "-i",
         str(datei),
