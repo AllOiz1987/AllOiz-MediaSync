@@ -1,5 +1,14 @@
 .venv/
+__pycache__/
+*.pyc
+
+AllOiz_Projekte/
+*_sicherung.py
+
 *.wav
 *.srt
-AllOiz_Projekte/
 *.mp4
+*.mkv
+*.mov
+*.webm
+*.zip
