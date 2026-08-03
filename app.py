@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import webbrowser
 from pathlib import Path
 from queue import Empty, Queue
 from tkinter import (
@@ -33,7 +34,8 @@ from transkription import transkribieren
 
 
 APP_NAME = "AllOiz MediaSync"
-VERSION = "1.6"
+VERSION = "1.7"
+FTTOMB_URL = "https://youtube.com/@fttomb?si=2Do-N6thE5vaHfwS"
 
 ERLAUBTE_FORMATE = {
     ".mp4",
@@ -1087,6 +1089,13 @@ class AllOizApp:
             padx=(10, 0),
         )
 
+        ueber_button = ttk.Button(
+            datei_aktionen,
+            text="Über AllOiz",
+            command=self.ueber_alloiz_anzeigen,
+        )
+        ueber_button.pack(side=RIGHT)
+
         self.fortschritt = ttk.Progressbar(
             hauptbereich,
             mode="indeterminate",
@@ -1144,6 +1153,134 @@ class AllOizApp:
         self.protokoll.pack(
             fill=BOTH,
             expand=True,
+        )
+
+    def fttomb_oeffnen(self) -> None:
+        """Öffnet den offiziellen FTTOMB-Kanal im Standardbrowser."""
+        try:
+            webbrowser.open(FTTOMB_URL, new=2)
+        except Exception as fehler:
+            messagebox.showerror(
+                "Link konnte nicht geöffnet werden",
+                (
+                    "Der FTTOMB-Kanal konnte nicht geöffnet werden.\n\n"
+                    f"{FTTOMB_URL}\n\n"
+                    f"Fehler: {fehler}"
+                ),
+            )
+
+    def ueber_alloiz_anzeigen(self) -> None:
+        """Zeigt Informationen über AllOiz und den FTTOMB-Kanal."""
+        dialog = Toplevel(self.fenster)
+        dialog.title(f"Über {APP_NAME}")
+        dialog.geometry("600x470")
+        dialog.resizable(False, False)
+        dialog.configure(bg=CHARCOAL)
+        dialog.transient(self.fenster)
+        dialog.grab_set()
+
+        inhalt = Frame(dialog, bg=CHARCOAL, padx=34, pady=28)
+        inhalt.pack(fill=BOTH, expand=True)
+
+        Label(
+            inhalt,
+            text=f"{APP_NAME} v{VERSION}",
+            bg=CHARCOAL,
+            fg=GOLD,
+            font=("Segoe UI", 22, "bold"),
+        ).pack()
+
+        Label(
+            inhalt,
+            text="Alle Medien. Eine Sprache.",
+            bg=CHARCOAL,
+            fg=TUERKIS,
+            font=("Segoe UI", 12, "bold"),
+        ).pack(pady=(4, 18))
+
+        Label(
+            inhalt,
+            text=(
+                "Lokale Medienanalyse und KI-Transkription für Windows.\n"
+                "Die Verarbeitung deiner Medien erfolgt direkt auf deinem Computer."
+            ),
+            bg=CHARCOAL,
+            fg=TEXT,
+            font=("Segoe UI", 10),
+            justify="center",
+        ).pack()
+
+        promo = Frame(
+            inhalt,
+            bg=DUNKEL,
+            padx=24,
+            pady=20,
+            highlightbackground=TUERKIS,
+            highlightthickness=1,
+        )
+        promo.pack(fill="x", pady=24)
+
+        Label(
+            promo,
+            text="Musik & kreative Projekte",
+            bg=DUNKEL,
+            fg=TEXT_GRAU,
+            font=("Segoe UI", 10, "bold"),
+        ).pack()
+
+        Label(
+            promo,
+            text="FTTOMB",
+            bg=DUNKEL,
+            fg=GOLD,
+            font=("Segoe UI", 20, "bold"),
+        ).pack(pady=(4, 8))
+
+        Label(
+            promo,
+            text=(
+                "AllOiz MediaSync entsteht aus demselben kreativen Umfeld "
+                "wie die Musik von FTTOMB. Hör gern auf YouTube rein."
+            ),
+            bg=DUNKEL,
+            fg=TEXT,
+            font=("Segoe UI", 10),
+            wraplength=470,
+            justify="center",
+        ).pack(pady=(0, 14))
+
+        ttk.Button(
+            promo,
+            text="FTTOMB auf YouTube öffnen",
+            command=self.fttomb_oeffnen,
+            style="Tuerkis.TButton",
+        ).pack()
+
+        Label(
+            inhalt,
+            text="Entwickelt mit Freude, Musik und viel Kaffee.",
+            bg=CHARCOAL,
+            fg=TEXT_GRAU,
+            font=("Segoe UI", 9),
+        ).pack(pady=(0, 14))
+
+        ttk.Button(
+            inhalt,
+            text="Schließen",
+            command=dialog.destroy,
+        ).pack()
+
+        dialog.update_idletasks()
+        x_position = (
+            self.fenster.winfo_x()
+            + (self.fenster.winfo_width() - dialog.winfo_width()) // 2
+        )
+        y_position = (
+            self.fenster.winfo_y()
+            + (self.fenster.winfo_height() - dialog.winfo_height()) // 2
+        )
+        dialog.geometry(
+            f"+{max(0, x_position)}+{max(0, y_position)}"
         )
 
     def log_schreiben(self, text: str) -> None:
