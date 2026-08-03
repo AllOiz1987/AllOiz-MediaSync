@@ -1,0 +1,22 @@
+AllOiz MediaSync - Drittanbieter-Hinweise
+========================================
+
+Diese Windows-Ausgabe enthält die separat ausgeführten Programme
+FFmpeg und FFprobe.
+
+Komponente: FFmpeg / FFprobe
+Version: 8.1.2 full build
+Build-Anbieter: Gyan Doshi (gyan.dev)
+Build-Informationen: https://www.gyan.dev/ffmpeg/builds/
+FFmpeg-Projekt: https://ffmpeg.org/
+Quellcode: https://ffmpeg.org/download.html
+
+Der verwendete Gyan-Build ist unter der GNU General Public License,
+Version 3 (GPLv3), lizenziert. Eine Kopie des Lizenztexts befindet
+sich in der Datei GPL-3.0.txt.
+
+FFmpeg ist ein eigenstaendiges Drittanbieterprojekt. AllOiz MediaSync
+ist weder mit dem FFmpeg-Projekt noch mit dem Build-Anbieter verbunden.
+
+Die Urheberrechte an FFmpeg und den enthaltenen Bibliotheken verbleiben
+bei den jeweiligen Rechteinhabern.
