@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -543,6 +544,8 @@ class AllOizApp:
         self.infos: dict | None = None
         self.letzter_projektordner: Path | None = None
         self.letztes_projekt: dict | None = None
+        self.letzte_transkript_datei: Path | None = None
+        self.letzte_untertitel_datei: Path | None = None
 
         self.dateipfad = StringVar(
             value="Noch keine Mediendatei ausgewählt."
@@ -919,6 +922,31 @@ class AllOizApp:
         )
         self.ordner_button.pack(side=RIGHT)
 
+        datei_aktionen = ttk.Frame(hauptbereich)
+        datei_aktionen.pack(
+            fill="x",
+            pady=(0, 12),
+        )
+
+        self.transkript_button = ttk.Button(
+            datei_aktionen,
+            text="Transkript öffnen",
+            command=self.transkript_oeffnen,
+            state=DISABLED,
+        )
+        self.transkript_button.pack(side=LEFT)
+
+        self.untertitel_button = ttk.Button(
+            datei_aktionen,
+            text="Untertitel öffnen",
+            command=self.untertitel_oeffnen,
+            state=DISABLED,
+        )
+        self.untertitel_button.pack(
+            side=LEFT,
+            padx=(10, 0),
+        )
+
         self.fortschritt = ttk.Progressbar(
             hauptbereich,
             mode="indeterminate",
@@ -1018,6 +1046,8 @@ class AllOizApp:
 
         self.datei = datei
         self.infos = None
+        self.letzte_transkript_datei = None
+        self.letzte_untertitel_datei = None
         self.dateipfad.set(str(datei))
         self.status.set("Datei ausgewählt.")
 
@@ -1031,6 +1061,8 @@ class AllOizApp:
         self.analyse_button.config(state=NORMAL)
         self.start_button.config(state=DISABLED)
         self.ki_button.config(state=DISABLED)
+        self.transkript_button.config(state=DISABLED)
+        self.untertitel_button.config(state=DISABLED)
 
         self.log_schreiben(
             f"Datei ausgewählt: {datei.name}"
@@ -1041,6 +1073,8 @@ class AllOizApp:
         self.analyse_button.config(state=DISABLED)
         self.start_button.config(state=DISABLED)
         self.ki_button.config(state=DISABLED)
+        self.transkript_button.config(state=DISABLED)
+        self.untertitel_button.config(state=DISABLED)
         self.modell_box.config(state=DISABLED)
         self.sprache_box.config(state=DISABLED)
         self.fortschritt.start(12)
@@ -1061,6 +1095,18 @@ class AllOizApp:
             and self.letztes_projekt.get("ki_ok")
         ):
             self.ki_button.config(state=NORMAL)
+
+        if (
+            self.letzte_transkript_datei
+            and self.letzte_transkript_datei.exists()
+        ):
+            self.transkript_button.config(state=NORMAL)
+
+        if (
+            self.letzte_untertitel_datei
+            and self.letzte_untertitel_datei.exists()
+        ):
+            self.untertitel_button.config(state=NORMAL)
 
         self.fortschritt.stop()
 
@@ -1545,6 +1591,11 @@ class AllOizApp:
         txt_datei = ergebnis["txt_datei"]
         srt_datei = ergebnis["srt_datei"]
 
+        self.letzte_transkript_datei = Path(txt_datei)
+        self.letzte_untertitel_datei = Path(srt_datei)
+        self.transkript_button.config(state=NORMAL)
+        self.untertitel_button.config(state=NORMAL)
+
         self.status.set(
             "KI-Transkription erfolgreich abgeschlossen."
         )
@@ -1566,6 +1617,39 @@ class AllOizApp:
                 f"\n\nTranskript:\n{txt_datei}"
                 f"\n\nUntertitel:\n{srt_datei}"
             ),
+        )
+
+    def datei_oeffnen(
+        self,
+        datei: Path | None,
+        bezeichnung: str,
+    ) -> None:
+        if not datei or not datei.exists():
+            messagebox.showerror(
+                "Datei nicht gefunden",
+                f"Die {bezeichnung} wurde nicht gefunden.",
+            )
+            return
+
+        try:
+            os.startfile(str(datei))
+
+        except OSError as fehler:
+            messagebox.showerror(
+                "Datei konnte nicht geöffnet werden",
+                str(fehler),
+            )
+
+    def transkript_oeffnen(self) -> None:
+        self.datei_oeffnen(
+            self.letzte_transkript_datei,
+            "Transkriptdatei",
+        )
+
+    def untertitel_oeffnen(self) -> None:
+        self.datei_oeffnen(
+            self.letzte_untertitel_datei,
+            "Untertiteldatei",
         )
 
     def ergebnisordner_oeffnen(self) -> None:
