@@ -20,6 +20,9 @@ from tkinter import (
     StringVar,
     Text,
     Tk,
+    Toplevel,
+    Label,
+    Frame,
     filedialog,
     messagebox,
 )
@@ -590,6 +593,103 @@ class AllOizApp:
             self.status.set(
                 "FFmpeg oder FFprobe fehlt."
             )
+
+        self.startbildschirm_anzeigen()
+
+    def startbildschirm_anzeigen(self) -> None:
+        self.fenster.withdraw()
+
+        splash = Toplevel(self.fenster)
+        self.splash = splash
+        splash.overrideredirect(True)
+        splash.configure(bg=CHARCOAL)
+        splash.attributes("-topmost", True)
+
+        breite = 620
+        hoehe = 360
+        bildschirm_breite = splash.winfo_screenwidth()
+        bildschirm_hoehe = splash.winfo_screenheight()
+        x = (bildschirm_breite - breite) // 2
+        y = (bildschirm_hoehe - hoehe) // 2
+
+        splash.geometry(
+            f"{breite}x{hoehe}+{x}+{y}"
+        )
+
+        rahmen = Frame(
+            splash,
+            bg=CHARCOAL,
+            highlightbackground=GOLD,
+            highlightthickness=2,
+        )
+        rahmen.pack(
+            fill=BOTH,
+            expand=True,
+            padx=4,
+            pady=4,
+        )
+
+        Label(
+            rahmen,
+            text="👍",
+            bg=CHARCOAL,
+            fg=GOLD,
+            font=("Segoe UI Emoji", 52),
+        ).pack(pady=(42, 0))
+
+        Label(
+            rahmen,
+            text=APP_NAME,
+            bg=CHARCOAL,
+            fg=GOLD,
+            font=("Segoe UI", 29, "bold"),
+        ).pack(pady=(0, 6))
+
+        Label(
+            rahmen,
+            text="Alle Medien. Eine Sprache.",
+            bg=CHARCOAL,
+            fg=TUERKIS,
+            font=("Segoe UI", 14, "bold"),
+        ).pack()
+
+        Label(
+            rahmen,
+            text=f"VERSION {VERSION}  •  LOKALE KI",
+            bg=CHARCOAL,
+            fg=TEXT_GRAU,
+            font=("Segoe UI", 9, "bold"),
+        ).pack(pady=(28, 18))
+
+        ladeleiste = Frame(
+            rahmen,
+            bg=DUNKEL,
+            height=5,
+            width=440,
+        )
+        ladeleiste.pack()
+        ladeleiste.pack_propagate(False)
+
+        fortschritt = Frame(
+            ladeleiste,
+            bg=TUERKIS,
+            height=5,
+            width=440,
+        )
+        fortschritt.pack(side=LEFT)
+
+        splash.after(
+            1900,
+            self.startbildschirm_schliessen,
+        )
+
+    def startbildschirm_schliessen(self) -> None:
+        if hasattr(self, "splash"):
+            self.splash.destroy()
+
+        self.fenster.deiconify()
+        self.fenster.lift()
+        self.fenster.focus_force()
 
     def design_einrichten(self) -> None:
         stil = ttk.Style(self.fenster)
