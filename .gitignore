@@ -12,3 +12,7 @@ AllOiz_Projekte/
 *.mov
 *.webm
 *.zip
+
+build/
+dist/
+*.spec
