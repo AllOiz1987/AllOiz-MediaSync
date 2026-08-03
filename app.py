@@ -39,6 +39,17 @@ ERLAUBTE_FORMATE = {
 
 EREIGNISSE: Queue[tuple[str, object]] = Queue()
 
+CHARCOAL = "#202328"
+DUNKEL = "#15171B"
+PANEL = "#292D33"
+PANEL_HELL = "#333840"
+GOLD = "#C9A227"
+GOLD_HELL = "#E0C45A"
+TUERKIS = "#1DB9B8"
+TUERKIS_HELL = "#55D6D4"
+TEXT = "#F2F2F2"
+TEXT_GRAU = "#B8BDC7"
+
 
 def projektname_erzeugen(name: str) -> str:
     bereinigt = re.sub(
@@ -544,9 +555,11 @@ class AllOizApp:
         self.fenster.title(
             f"{APP_NAME} v{VERSION}"
         )
-        self.fenster.geometry("820x660")
-        self.fenster.minsize(720, 580)
+        self.fenster.geometry("920x720")
+        self.fenster.minsize(820, 650)
+        self.fenster.configure(bg=CHARCOAL)
 
+        self.design_einrichten()
         self.oberflaeche_erstellen()
         self.ereignisse_pruefen()
 
@@ -567,6 +580,115 @@ class AllOizApp:
                 "FFmpeg oder FFprobe fehlt."
             )
 
+    def design_einrichten(self) -> None:
+        stil = ttk.Style(self.fenster)
+        stil.theme_use("clam")
+
+        stil.configure(
+            ".",
+            background=CHARCOAL,
+            foreground=TEXT,
+            fieldbackground=PANEL,
+            bordercolor=PANEL_HELL,
+            lightcolor=PANEL_HELL,
+            darkcolor=DUNKEL,
+            font=("Segoe UI", 10),
+        )
+        stil.configure("TFrame", background=CHARCOAL)
+        stil.configure(
+            "TLabel",
+            background=CHARCOAL,
+            foreground=TEXT_GRAU,
+        )
+        stil.configure(
+            "Titel.TLabel",
+            background=CHARCOAL,
+            foreground=GOLD,
+            font=("Segoe UI", 24, "bold"),
+        )
+        stil.configure(
+            "Untertitel.TLabel",
+            background=CHARCOAL,
+            foreground=TUERKIS,
+            font=("Segoe UI", 11, "bold"),
+        )
+        stil.configure(
+            "Status.TLabel",
+            background=CHARCOAL,
+            foreground=GOLD_HELL,
+            font=("Segoe UI", 10, "bold"),
+        )
+        stil.configure(
+            "TLabelframe",
+            background=PANEL,
+            bordercolor=PANEL_HELL,
+            relief="solid",
+            borderwidth=1,
+        )
+        stil.configure(
+            "TLabelframe.Label",
+            background=CHARCOAL,
+            foreground=GOLD,
+            font=("Segoe UI", 10, "bold"),
+        )
+        stil.configure(
+            "TButton",
+            background=PANEL_HELL,
+            foreground=TEXT,
+            borderwidth=0,
+            focuscolor=TUERKIS,
+            padding=(12, 8),
+            font=("Segoe UI", 9, "bold"),
+        )
+        stil.map(
+            "TButton",
+            background=[
+                ("active", "#424852"),
+                ("disabled", PANEL),
+            ],
+            foreground=[
+                ("disabled", "#707680"),
+            ],
+        )
+        stil.configure(
+            "Gold.TButton",
+            background=GOLD,
+            foreground=DUNKEL,
+        )
+        stil.map(
+            "Gold.TButton",
+            background=[
+                ("active", GOLD_HELL),
+                ("disabled", PANEL),
+            ],
+            foreground=[
+                ("disabled", "#707680"),
+            ],
+        )
+        stil.configure(
+            "Tuerkis.TButton",
+            background=TUERKIS,
+            foreground=DUNKEL,
+        )
+        stil.map(
+            "Tuerkis.TButton",
+            background=[
+                ("active", TUERKIS_HELL),
+                ("disabled", PANEL),
+            ],
+            foreground=[
+                ("disabled", "#707680"),
+            ],
+        )
+        stil.configure(
+            "TProgressbar",
+            background=TUERKIS,
+            troughcolor=DUNKEL,
+            bordercolor=DUNKEL,
+            lightcolor=TUERKIS,
+            darkcolor=TUERKIS,
+        )
+
     def oberflaeche_erstellen(self) -> None:
         hauptbereich = ttk.Frame(
             self.fenster,
@@ -580,14 +702,14 @@ class AllOizApp:
         titel = ttk.Label(
             hauptbereich,
             text=f"👍  {APP_NAME}",
-            font=("Segoe UI", 22, "bold"),
+            style="Titel.TLabel",
         )
         titel.pack(pady=(0, 4))
 
         untertitel = ttk.Label(
             hauptbereich,
             text="Alle Medien. Eine Sprache.",
-            font=("Segoe UI", 11),
+            style="Untertitel.TLabel",
         )
         untertitel.pack(pady=(0, 20))
 
@@ -658,6 +780,7 @@ class AllOizApp:
             text="👍  Projektpaket erstellen",
             command=self.projekt_starten,
             state=DISABLED,
+            style="Gold.TButton",
         )
         self.start_button.pack(
             side=LEFT,
@@ -669,6 +792,7 @@ class AllOizApp:
             text="KI-Transkription starten",
             command=self.transkription_starten,
             state=DISABLED,
+            style="Tuerkis.TButton",
         )
         self.ki_button.pack(side=LEFT)
 
@@ -692,7 +816,7 @@ class AllOizApp:
         status_label = ttk.Label(
             hauptbereich,
             textvariable=self.status,
-            font=("Segoe UI", 10, "bold"),
+            style="Status.TLabel",
         )
         status_label.pack(
             anchor="w",
@@ -724,6 +848,15 @@ class AllOizApp:
             wrap="word",
             state=DISABLED,
             font=("Consolas", 9),
+            background=DUNKEL,
+            foreground=TEXT,
+            insertbackground=TUERKIS,
+            selectbackground=TUERKIS,
+            selectforeground=DUNKEL,
+            relief="flat",
+            borderwidth=0,
+            padx=10,
+            pady=10,
         )
         self.protokoll.pack(
             fill=BOTH,
