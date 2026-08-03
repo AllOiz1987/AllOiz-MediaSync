@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
+import re
 import shutil
 import subprocess
 import threading
@@ -26,7 +28,7 @@ from transkription import transkribieren
 
 
 APP_NAME = "AllOiz MediaSync"
-VERSION = "1.3"
+VERSION = "1.4"
 
 ERLAUBTE_FORMATE = {
     ".mp4",
@@ -36,6 +38,31 @@ ERLAUBTE_FORMATE = {
 }
 
 EREIGNISSE: Queue[tuple[str, object]] = Queue()
+
+
+def projektname_erzeugen(name: str) -> str:
+    bereinigt = re.sub(
+        r"[^A-Za-z0-9ÄÖÜäöüß _-]",
+        "_",
+        name,
+    )
+    bereinigt = re.sub(r"\s+", " ", bereinigt)
+    bereinigt = re.sub(r"_+", "_", bereinigt)
+    bereinigt = bereinigt.strip(" ._-")
+
+    if not bereinigt:
+        bereinigt = "AllOiz_Projekt"
+
+    if len(bereinigt) <= 60:
+        return bereinigt
+
+    kennung = hashlib.sha1(
+        name.encode("utf-8")
+    ).hexdigest()[:8]
+
+    kurzer_name = bereinigt[:50].rstrip(" ._-")
+
+    return f"{kurzer_name}_{kennung}"
 
 
 def zeit_formatieren(sekunden: float | str) -> str:
@@ -153,7 +180,8 @@ def projektstruktur_erstellen(
     )
     hauptordner.mkdir(exist_ok=True)
 
-    projektordner = hauptordner / datei.stem
+    projektname = projektname_erzeugen(datei.stem)
+    projektordner = hauptordner / projektname
     projektordner.mkdir(exist_ok=True)
 
     ordner = {
@@ -177,7 +205,10 @@ def originaldatei_kopieren(
     datei: Path,
     video_ordner: Path,
 ) -> Path:
-    ziel = video_ordner / datei.name
+    projektname = video_ordner.parent.name
+    ziel = video_ordner / (
+        f"{projektname}{datei.suffix.lower()}"
+    )
 
     if datei.resolve() != ziel.resolve():
         shutil.copy2(datei, ziel)
@@ -189,7 +220,8 @@ def audio_extrahieren(
     datei: Path,
     audio_ordner: Path,
 ) -> Path:
-    ausgabe = audio_ordner / f"{datei.stem}.wav"
+    projektname = audio_ordner.parent.name
+    ausgabe = audio_ordner / f"{projektname}.wav"
 
     befehl = [
         "ffmpeg",
